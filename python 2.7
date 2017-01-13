@@ -1,0 +1,75 @@
+#!/usr/bin/env python
+# -*- coding: utf8 -*-
+
+import csv
+import re
+from collections import OrderedDict
+
+VardasPavarde='*'			# Įvesti vardą ir pavardę
+Failas='*.csv'				# Failo pavadinimas
+
+file=open(Failas)
+line=csv.DictReader(file)
+
+total_turnover=total_investment=total_back_for_loan=total_autoinvestment=total_late_fees=total_early_temination=num_of_loans=0
+lst=[]
+dict={}
+f=open('paskolos.txt','w')   
+for i in line:
+	pay=i['Gavėjas / Mokėtojas'].split()[0]+' '+i['Gavėjas / Mokėtojas'].split()[1]
+	data=i['Data'][0:19]
+	sum=float(i['Suma ir valiuta'].replace(',','.'))
+	purpose=i['Mokėjimo paskirtis'] 	
+	total_turnover+=sum
+	if pay==VardasPavarde or pay==VardasPavarde.upper():		
+		total_investment+=sum
+	elif purpose.startswith('AutoInvestment in loan') or purpose.startswith('Investment in loan'):	
+		loanID=re.findall('#([0-9]*)',purpose)[0]
+		total_autoinvestment+=-sum
+		num_of_loans+=1			
+		dict[loanID]=({data:sum})		
+	elif purpose.startswith('this is money back for loan'):		
+		loanID=re.findall('#([0-9]*)',purpose)[0]
+		period=re.findall('period (.*)',purpose)[0]
+		total_back_for_loan+=sum
+		dict[loanID].update({data:sum})
+	elif purpose.startswith('Late fees and interest'):				
+		total_late_fees+=sum
+		try:
+			loanID=re.findall(': ([0-9]*)',purpose)[0]
+			dict[loanID].update({data:sum})			
+		except:	None
+		try:
+			loanID=re.findall('#([0-9]*)',purpose)[0]
+			dict[loanID].update({data:sum})						
+		except:	None		
+	elif purpose.startswith('return back for loan'):	
+		total_early_temination+=sum
+		try:
+			dict[loanID].update({data:sum})			
+		except:
+			continue
+	else:		
+		print 'Kita:',purpose,sum
+		None	
+d=sorted(dict.items(), key=lambda x: x[0])		
+for i in d:	
+	left=0	
+	for k,v in i[1].iteritems():
+		left=left+v				
+	dd=sorted(i[1].items(), key=lambda x: x[0])		
+	final='Paskolos ID: '+str(i[0])+'\t'+'Likutis: '+str(left)+'\t'+'Mokėjimai: '+str(dd)	
+	final=re.sub(r"'",'',final)
+	final=re.sub(r"\[",'',final)
+	final=re.sub(r"\]",'',final)	
+	f.write(final+'\n')
+
+f.write('\n'+'Apyvarta: '+str(total_turnover)+' EUR'+'\n')										
+f.write('Viso investuota asmeninių lėšų: '+str(total_investment)+' EUR'+'\n')   			
+f.write('Viso grąžinta už paskolas: '+str(total_back_for_loan)+' EUR'+'\n') 				
+f.write('Viso investuota: '+str(total_autoinvestment)+' EUR'+'\n')							
+f.write('Viso vėluojančių įmokų + palūkanos: '+str(total_late_fees)+' EUR'+'\n')			
+f.write('Viso anksčiau laiko grąžintos paskolos: '+str(total_early_temination)+' EUR'+'\n')	
+f.write('Paskolų skaičius:'+str(num_of_loans)+'\n')
+print "Atlikta"
+f.close   
